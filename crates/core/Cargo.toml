@@ -1,0 +1,9 @@
+[package]
+name = "typeset-core"
+description = "Types shared between the Typeset server and desktop client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
