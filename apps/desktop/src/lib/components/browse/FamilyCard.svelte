@@ -4,7 +4,6 @@
   import iconHeartOutline from "@ktibow/iconset-material-symbols/favorite-outline";
   import iconAdd from "@ktibow/iconset-material-symbols/add";
   import iconCheck from "@ktibow/iconset-material-symbols/check";
-  import iconLaptop from "@ktibow/iconset-material-symbols/laptop-mac";
   import { familyKey, type CatalogFamily } from "$lib/api";
   import { app } from "$lib/state.svelte";
   import FontText from "./FontText.svelte";
@@ -37,40 +36,37 @@
     <span class="meta">
       {#if custom}<span class="m3-font-title-small name">{family.family}</span>{/if}
       <span class="m3-font-body-small sub">
-        {prettyCategory(family.category)} · {styles}
-        {#if isInstalled}
-          <span class="installed" title="Installed on this computer">
-            <Icon icon={iconLaptop} size={14} /> Installed
-          </span>
-        {/if}
+        {prettyCategory(family.category)}, {styles}
       </span>
     </span>
   </button>
 
   <div class="actions">
-    <IconButton
+    <span class="quiet" class:keep={entry?.favorite}>
+      <IconButton
       icon={entry?.favorite ? iconHeart : iconHeartOutline}
       label={entry?.favorite ? `Remove ${family.family} from favorites` : `Add ${family.family} to favorites`}
       pressed={entry?.favorite ?? false}
       accent="error"
-      onclick={() => app.toggleFavorite(key)}
-    />
-    <FamilyMenu familyKey={key} name={family.family} full />
+        onclick={() => app.toggleFavorite(key)}
+      />
+    </span>
+    <span class="quiet"><FamilyMenu familyKey={key} name={family.family} full /></span>
     <div class="ml-auto">
       {#if entry}
         <Button
-          variant="tonal"
+          variant="text"
           size="s"
           iconType="left"
-          title="In your library. Click to remove."
+          title="{isInstalled ? 'Installed on this computer' : 'In your library'}. Click to remove from your library."
           aria-label="{family.family} is in your library. Remove from library"
           onclick={() => removeWithUndo(key, family.family)}
         >
-          <Icon icon={iconCheck} size={20} /> In library
+          <Icon icon={iconCheck} size={20} /> {isInstalled ? "Installed" : "In library"}
         </Button>
       {:else}
         <Button
-          variant="outlined"
+          variant="text"
           size="s"
           iconType="left"
           aria-label="Add {family.family} to library"
@@ -89,18 +85,25 @@
     flex-direction: column;
     border-radius: var(--m3-shape-large);
     background-color: var(--m3c-surface-container-low);
-    border: 1px solid var(--m3c-outline-variant);
     color: var(--m3c-on-surface);
     overflow: hidden;
-    transition:
-      box-shadow 200ms ease,
-      border-color 200ms ease,
-      background-color 200ms ease;
+    transition: background-color 150ms ease;
   }
   .card:hover,
   .card:focus-within {
     background-color: var(--m3c-surface-container);
-    box-shadow: var(--m3-elevation-2);
+  }
+  /* Favourite and menu stay out of the way until the card is in use. A
+     favourited heart stays visible. */
+  .quiet {
+    display: inline-flex;
+    transition: opacity 150ms ease;
+  }
+  @media (hover: hover) {
+    /* Also stay visible while this card's menu is open. */
+    .card:not(:hover):not(:focus-within):not(:has([aria-expanded="true"])) .quiet:not(.keep) {
+      opacity: 0;
+    }
   }
   .open {
     display: flex;
@@ -146,27 +149,10 @@
     gap: 0.25rem 0.5rem;
     color: var(--m3c-on-surface-variant);
   }
-  .installed {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.125rem;
-    color: var(--m3c-tertiary);
-  }
   .actions {
     display: flex;
     align-items: center;
     gap: 0.25rem;
     padding: 0.25rem 0.75rem 0.75rem;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .card {
-      transition:
-        transform 200ms var(--m3-timing-function-emphasized-decel, ease),
-        box-shadow 200ms ease,
-        background-color 200ms ease;
-    }
-    .card:hover {
-      transform: translateY(-2px);
-    }
   }
 </style>

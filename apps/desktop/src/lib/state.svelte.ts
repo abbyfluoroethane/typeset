@@ -35,9 +35,12 @@ function describeChanges(r: ReconcileReport): string {
   return parts.join(", ");
 }
 
+/** In `pnpm dev`, `?view=library` and `?detail=google:Inter` open a screen directly. */
+const preview = import.meta.env.DEV ? new URLSearchParams(globalThis.location?.search) : null;
+
 class AppState {
   booted = $state(false);
-  view = $state<View>("browse");
+  view = $state<View>((preview?.get("view") as View | null) ?? "browse");
   settings = $state<Settings>({ serverUrl: null, autoInstall: true });
   user = $state<User | null>(null);
   catalog = $state.raw<CatalogFamily[]>([]);
@@ -53,7 +56,7 @@ class AppState {
   signInError = $state<string | null>(null);
   previewText = $state("");
   /** Family currently shown in the detail dialog. */
-  detailKey = $state<string | null>(null);
+  detailKey = $state<string | null>(preview?.get("detail") ?? null);
   /** Keys with an install/uninstall in flight. */
   busyKeys = $state<string[]>([]);
 

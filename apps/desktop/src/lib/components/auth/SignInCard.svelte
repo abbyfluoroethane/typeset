@@ -4,6 +4,7 @@
   import iconError from "@ktibow/iconset-material-symbols/error-rounded";
   import iconLink from "@ktibow/iconset-material-symbols/link-rounded";
   import { app } from "$lib/state.svelte";
+  import Logo from "$lib/components/common/Logo.svelte";
 
   let url = $state(app.settings.serverUrl ?? "");
 
@@ -26,59 +27,51 @@
     if (!(await app.saveServerUrl(url))) return;
     await app.signIn();
   }
-
-  // Hero glyphs: weight and optical size are the font's variable axes.
-  const glyphs = [
-    { t: "A", w: 900, o: 144, cls: "g1" },
-    { t: "g", w: 200, o: 144, cls: "g2" },
-    { t: "&", w: 500, o: 144, cls: "g3" },
-    { t: "Rr", w: 760, o: 100, cls: "g4" },
-    { t: "a", w: 100, o: 144, cls: "g5" },
-  ];
 </script>
 
 <div class="flex h-full gap-3 bg-surface p-3">
+  <!-- A quiet type specimen: one face, one colour, one slow change of weight. -->
   <section
-    class="hero relative hidden flex-1 overflow-hidden rounded-[48px] bg-surface-container text-on-surface min-[860px]:block"
+    class="specimen hidden flex-1 flex-col justify-between overflow-hidden rounded-[32px] bg-surface-container p-10 min-[860px]:flex"
     aria-hidden="true"
   >
-    {#each glyphs as g (g.cls)}
-      <span class="glyph {g.cls}" style:font-variation-settings="'wght' {g.w}, 'opsz' {g.o}">{g.t}</span>
-    {/each}
+    <p class="m3-font-label-large text-on-surface-variant">Google Sans Flex</p>
+    <p class="sample text-on-surface">Aa</p>
+    <div class="space-y-3 text-on-surface-variant">
+      <p class="pangram">Sphinx of black quartz, judge my vow.</p>
+      <p class="charset">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br />abcdefghijklmnopqrstuvwxyz<br />0123456789 &amp; ! ? @ #</p>
+    </div>
   </section>
 
   <section class="flex flex-1 items-center justify-center overflow-y-auto">
-    <form class="w-full max-w-md space-y-6 p-4" onsubmit={submit}>
-      <div class="space-y-3">
-        <p class="m3-font-label-large inline-block rounded-full bg-secondary-container px-3 py-1 text-on-secondary-container">
-          Font library sync
-        </p>
-        <h1 class="title text-primary">Typeset</h1>
-        <p class="m3-font-body-large text-on-surface-variant">
-          Connect to your Typeset server and carry your whole font library with you.
-        </p>
-      </div>
+    <form class="w-full max-w-[26rem] p-4" onsubmit={submit}>
+      <Logo size={56} />
+      <h1 class="title text-on-surface">Typeset</h1>
+      <p class="m3-font-body-large mb-10 text-on-surface-variant">
+        Sign in to your server to keep the same fonts on every machine.
+      </p>
 
-      <div class="field"><TextField
-        label="Server URL"
-        type="url"
-        required
-        bind:value={url}
-        disabled={app.signingIn}
-        leadingIcon={iconLink}
-        placeholder="https://fonts.example.com"
-        autocomplete="url"
-        spellcheck={false}
-        error={touched && !!urlError}
-        oninput={() => (touched = true)}
-      />
+      <div class="field">
+        <TextField
+          label="Server URL"
+          type="url"
+          required
+          bind:value={url}
+          disabled={app.signingIn}
+          leadingIcon={iconLink}
+          placeholder="https://fonts.example.com"
+          autocomplete="url"
+          spellcheck={false}
+          error={touched && !!urlError}
+          oninput={() => (touched = true)}
+        />
         <p class="hint m3-font-body-small" class:bad={touched && !!urlError} role={touched && urlError ? "alert" : undefined}>
-          {touched && urlError ? urlError : "The address of your Typeset server. Ask your admin if you're not sure."}
+          {touched && urlError ? urlError : "The address of your Typeset server."}
         </p>
       </div>
 
       {#if app.signingIn}
-        <div class="flex items-center gap-4 rounded-xl bg-secondary-container p-4 text-on-secondary-container" role="status">
+        <div class="mt-6 flex items-center gap-4 rounded-xl bg-secondary-container p-4 text-on-secondary-container" role="status">
           <LoadingIndicator size={40} aria-label="Waiting for your browser" />
           <div class="min-w-0 flex-1">
             <p class="m3-font-title-medium">Waiting for your browser</p>
@@ -89,7 +82,7 @@
       {/if}
 
       {#if app.signInError}
-        <div class="flex items-start gap-3 rounded-xl bg-error-container p-4 text-on-error-container" role="alert">
+        <div class="mt-6 flex items-start gap-3 rounded-xl bg-error-container p-4 text-on-error-container" role="alert">
           <Icon icon={iconError} size={24} />
           <div>
             <p class="m3-font-title-medium">Sign in failed</p>
@@ -98,7 +91,7 @@
         </div>
       {/if}
 
-      <div class="flex items-center gap-2">
+      <div class="mt-8 flex items-center gap-2">
         <Button type="submit" variant="filled" size="m" iconType="left" disabled={app.signingIn || !url.trim()}>
           <Icon icon={iconLogin} />
           {app.signingIn ? "Waiting…" : "Sign in"}
@@ -114,53 +107,58 @@
     width: 100%;
   }
   .hint {
-    margin: 4px 0 0 16px;
+    margin: 6px 0 0 16px;
     color: var(--m3c-on-surface-variant);
   }
   .hint.bad {
     color: var(--m3c-error);
   }
-  .hero::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 85% 10%, color-mix(in oklab, var(--m3c-primary) 18%, transparent), transparent 55%);
-  }
   .title {
-    font-size: clamp(3rem, 6vw, 4.5rem);
-    line-height: 1;
-    letter-spacing: -0.03em;
-    font-weight: 800;
-    font-variation-settings: "opsz" 144;
-    margin: 0;
+    margin: 28px 0 12px;
+    font-size: 2.75rem;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    font-variation-settings: "opsz" 96;
   }
-  .hero {
+
+  .specimen {
     container-type: size;
-    background-image: radial-gradient(
-      circle at 20% 90%,
-      color-mix(in oklab, var(--m3c-tertiary) 22%, transparent),
-      transparent 60%
-    );
   }
-  .glyph {
-    position: absolute;
-    line-height: 0.8;
-    user-select: none;
-    animation: float 9s ease-in-out infinite alternate;
+  .sample {
+    margin: 0;
+    font-size: min(58cqh, 62cqw);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    font-weight: 400;
+    font-variation-settings: "opsz" 144;
+    animation: breathe 14s ease-in-out infinite alternate;
   }
-  .g1 { font-size: 62cqmin; left: 4cqw; top: 6cqh; color: var(--m3c-primary); }
-  .g2 { font-size: 70cqmin; right: 2cqw; top: 20cqh; color: var(--m3c-on-surface); opacity: 0.85; animation-delay: -3s; }
-  .g3 { font-size: 36cqmin; left: 8cqw; bottom: 4cqh; color: var(--m3c-tertiary); animation-delay: -5s; }
-  .g4 { font-size: 22cqmin; right: 10cqw; bottom: 8cqh; color: var(--m3c-secondary); animation-delay: -1s; }
-  .g5 { font-size: 30cqmin; left: 42cqw; top: 2cqh; color: var(--m3c-on-surface-variant); opacity: 0.5; animation-delay: -7s; }
-  @keyframes float {
+  .pangram {
+    margin: 0;
+    font-size: clamp(1.25rem, 4.2cqw, 2rem);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--m3c-on-surface);
+  }
+  .charset {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    letter-spacing: 0.08em;
+    overflow-wrap: anywhere;
+  }
+  /* The weight axis drifts between light and bold. */
+  @keyframes breathe {
+    from {
+      font-weight: 250;
+    }
     to {
-      translate: 0 -2.5cqh;
-      rotate: 2deg;
+      font-weight: 750;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .glyph {
+    .sample {
       animation: none;
     }
   }

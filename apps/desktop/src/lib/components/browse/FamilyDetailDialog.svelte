@@ -3,9 +3,7 @@
   import iconHeart from "@ktibow/iconset-material-symbols/favorite";
   import iconHeartOutline from "@ktibow/iconset-material-symbols/favorite-outline";
   import iconDownload from "@ktibow/iconset-material-symbols/download";
-  import iconDelete from "@ktibow/iconset-material-symbols/delete";
-  import iconLaptop from "@ktibow/iconset-material-symbols/laptop-mac";
-  import iconLibrary from "@ktibow/iconset-material-symbols/library-add-check";
+  import iconCheck from "@ktibow/iconset-material-symbols/check";
   import iconAdd from "@ktibow/iconset-material-symbols/add";
   import iconClose from "@ktibow/iconset-material-symbols/close";
   import { parseKey } from "$lib/api";
@@ -81,7 +79,8 @@
   onclick={(e) => e.target === e.currentTarget && close()}
 >
   {#if key && parsed}
-    <div class="sheet">
+    <!-- svelte-ignore a11y_autofocus -->
+    <div class="sheet" tabindex="-1" autofocus>
       <header class="head">
         <div class="min-w-0 flex-1">
           <h2 id="detail-title" class="sr-only">{parsed.family}</h2>
@@ -97,50 +96,33 @@
           </div>
           <p class="m3-font-body-medium meta">
             {#if catalogFamily}
-              {prettyCategory(catalogFamily.category)} · {variants.length} styles · {catalogFamily.version}
-              · {catalogFamily.subsets.length} subsets
+              {prettyCategory(catalogFamily.category)}, {variants.length} styles, {catalogFamily.subsets.length} subsets,
+              version {catalogFamily.version.replace(/^v/, "")}
             {:else}
-              Uploaded family
+              {uploadFiles.length} {uploadFiles.length === 1 ? "file" : "files"}
             {/if}
+          </p>
+          <p class="m3-font-body-medium status">
             {#if entry}
-              <span class="badge lib"><Icon icon={iconLibrary} size={16} /> In library</span>
-            {/if}
-            {#if installed}
-              <span class="badge inst"><Icon icon={iconLaptop} size={16} /> Installed</span>
+              <Icon icon={iconCheck} size={18} />
+              {installed ? "In your library and installed on this Mac" : "In your library, not installed on this Mac"}
+            {:else}
+              Not in your library
             {/if}
           </p>
         </div>
-        <IconButton icon={iconClose} label="Close" onclick={close} />
+        <div class="flex shrink-0 items-center gap-1">
+          <IconButton
+            icon={entry?.favorite ? iconHeart : iconHeartOutline}
+            label={entry?.favorite ? "Remove from favorites" : "Add to favorites"}
+            pressed={entry?.favorite ?? false}
+            accent="error"
+            onclick={() => app.toggleFavorite(key)}
+          />
+          <FamilyMenu familyKey={key} name={parsed.family} />
+          <IconButton icon={iconClose} label="Close" onclick={close} />
+        </div>
       </header>
-
-      <div class="actions">
-        {#if catalogFamily}
-          {#if entry}
-            <Button variant="filled" disabled={!dirty || selected.length === 0} onclick={save}>Save styles</Button>
-          {:else}
-            <Button variant="filled" iconType="left" disabled={selected.length === 0} onclick={save}>
-              <Icon icon={iconAdd} size={20} /> Add to library
-            </Button>
-          {/if}
-        {/if}
-        {#if installed}
-          <Button variant="outlined" iconType="left" disabled={busy} onclick={() => app.uninstall(key)}>
-            <Icon icon={iconDelete} size={20} /> Uninstall from this computer
-          </Button>
-        {:else}
-          <Button variant="tonal" iconType="left" disabled={busy} onclick={() => app.install(key)}>
-            <Icon icon={iconDownload} size={20} /> Install on this computer
-          </Button>
-        {/if}
-        <IconButton
-          icon={entry?.favorite ? iconHeart : iconHeartOutline}
-          label={entry?.favorite ? "Remove from favorites" : "Add to favorites"}
-          pressed={entry?.favorite ?? false}
-          accent="error"
-          onclick={() => app.toggleFavorite(key)}
-        />
-        <FamilyMenu familyKey={key} name={parsed.family} label />
-      </div>
 
       <div class="body">
         {#if catalogFamily}
@@ -197,12 +179,27 @@
       <footer class="foot">
         {#if entry}
           <span class="tone-error">
-            <Button variant="text" iconType="left" onclick={() => removeWithUndo(key, parsed.family)}>
-              <Icon icon={iconDelete} size={20} /> Remove from library
-            </Button>
+            <Button variant="text" onclick={() => removeWithUndo(key, parsed.family)}>Remove from library</Button>
           </span>
         {/if}
-        <div class="ml-auto"><Button variant="text" onclick={close}>Done</Button></div>
+        <div class="ml-auto flex items-center gap-2">
+          {#if installed}
+            <Button variant="text" disabled={busy} onclick={() => app.uninstall(key)}>Uninstall from this Mac</Button>
+          {:else if entry}
+            <Button variant="tonal" iconType="left" disabled={busy} onclick={() => app.install(key)}>
+              <Icon icon={iconDownload} size={20} /> Install on this Mac
+            </Button>
+          {/if}
+          {#if catalogFamily}
+            {#if !entry}
+              <Button variant="filled" iconType="left" disabled={selected.length === 0} onclick={save}>
+                <Icon icon={iconAdd} size={20} /> Add to library
+              </Button>
+            {:else if dirty}
+              <Button variant="filled" disabled={selected.length === 0} onclick={save}>Save styles</Button>
+            {/if}
+          {/if}
+        </div>
       </footer>
     </div>
   {/if}
@@ -251,7 +248,10 @@
     display: flex;
     align-items: flex-start;
     gap: 1rem;
-    padding: 1.5rem 1.5rem 0.5rem 2rem;
+    padding: 1.5rem 1.25rem 1.25rem 2rem;
+  }
+  .sheet:focus {
+    outline: none;
   }
   .hero {
     min-height: 4rem;
@@ -262,43 +262,21 @@
     width: 100%;
   }
   .meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
     margin: 0.25rem 0 0;
     color: var(--m3c-on-surface-variant);
   }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.125rem 0.625rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-  .badge.lib {
-    background-color: var(--m3c-primary-container);
-    color: var(--m3c-on-primary-container);
-  }
-  .badge.inst {
-    background-color: var(--m3c-tertiary-container);
-    color: var(--m3c-on-tertiary-container);
-  }
-  .actions {
+  .status {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 2rem 1rem;
+    gap: 0.375rem;
+    margin: 0.25rem 0 0;
+    color: var(--m3c-on-surface);
   }
   .body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     padding: 0.5rem 2rem 1rem;
-    border-top: 1px solid var(--m3c-outline-variant);
     background-color: var(--m3c-surface-container-low);
   }
   .toolrow {
@@ -342,13 +320,11 @@
   }
   .variant.on {
     background-color: var(--m3c-surface-container-high);
-    box-shadow: inset 0 0 0 1px var(--m3c-outline-variant);
   }
   .foot {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
-    border-top: 1px solid var(--m3c-outline-variant);
   }
 </style>

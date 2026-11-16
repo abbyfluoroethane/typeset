@@ -8,6 +8,7 @@
   import type { Upload } from "$lib/api";
   import { app } from "$lib/state.svelte";
   import PageHeader from "$lib/components/common/PageHeader.svelte";
+  import IconButton from "$lib/components/browse/IconButton.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
 
   let busy = $state(false);
@@ -65,15 +66,15 @@
   <PageHeader title="Uploads">
     {#snippet summary()}
       {#if groups.length > 0}
-        {plural(groups.length, "family", "families")} · {plural(app.uploads.length, "file", "files")} synced to
-        your account
+        {plural(groups.length, "family", "families")}, {plural(app.uploads.length, "file", "files")}, synced to your
+        other devices
       {:else}
         Your own TTF and OTF files, synced to your other devices
       {/if}
     {/snippet}
     {#snippet actions()}
-      <Button variant="filled" size="m" iconType="left" disabled={busy} onclick={pick}>
-        <Icon icon={iconUpload} /> Upload fonts
+      <Button variant="filled" size="s" iconType="left" disabled={busy} onclick={pick}>
+        <Icon icon={iconUpload} size={20} /> Upload fonts
       </Button>
     {/snippet}
   </PageHeader>
@@ -84,12 +85,6 @@
         {#each groups as g (g.family)}
           <section class="rounded-xl bg-surface-container-low p-2" aria-label={g.family}>
             <div class="flex items-center gap-3 px-3 py-2">
-              <div
-                class="m3-font-title-large grid size-10 shrink-0 place-items-center rounded-lg bg-secondary-container text-on-secondary-container"
-                aria-hidden="true"
-              >
-                {g.family.charAt(0).toUpperCase()}
-              </div>
               <div class="min-w-0 flex-1">
                 <h2 class="m3-font-title-medium truncate text-on-surface">{g.family}</h2>
                 <p class="m3-font-body-medium text-on-surface-variant">
@@ -111,20 +106,14 @@
                       {detail(u)}
                     </div>
                   </div>
-                  <span class="tone-error">
-                    <Button
-                      variant="text"
-                      iconType="full"
-                      aria-label="Delete {u.filename}"
-                      title="Delete {u.filename}"
-                      onclick={() => {
-                        deleting = u;
-                        deleteOpen = true;
-                      }}
-                    >
-                      <Icon icon={iconDelete} size={22} />
-                    </Button>
-                  </span>
+                  <IconButton
+                    icon={iconDelete}
+                    label="Delete {u.filename}"
+                    onclick={() => {
+                      deleting = u;
+                      deleteOpen = true;
+                    }}
+                  />
                 </li>
               {/each}
             </ul>

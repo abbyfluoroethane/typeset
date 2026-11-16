@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- Source of the app icon: the "Ts" mark from Logo.svelte on a macOS-style
+     tile. To regenerate, screenshot this page at 1024x1024 with a transparent
+     background into app-icon.png, then run `pnpm tauri icon app-icon.png`. -->
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: "Google Sans Flex";
+    src: url("node_modules/@fontsource-variable/google-sans-flex/files/google-sans-flex-latin-opsz-normal.woff2")
+      format("woff2");
+    font-weight: 1 1000;
+  }
+  html,
+  body {
+    margin: 0;
+    width: 1024px;
+    height: 1024px;
+    background: transparent;
+  }
+  /* macOS icon grid: an 824px tile centred on a 1024px canvas. */
+  .tile {
+    position: absolute;
+    inset: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 186px;
+    background: linear-gradient(180deg, #8f63ff 0%, #6a3de8 100%);
+    color: #ffffff;
+    font: 800 430px/1 "Google Sans Flex", sans-serif;
+    letter-spacing: -0.04em;
+    font-variation-settings: "opsz" 48;
+  }
+</style>
+<div class="tile">Ts</div>

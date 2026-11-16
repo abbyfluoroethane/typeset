@@ -8,6 +8,7 @@
   import iconSettings from "@ktibow/iconset-material-symbols/settings-rounded";
   import iconSync from "@ktibow/iconset-material-symbols/sync-rounded";
   import { app, type View } from "$lib/state.svelte";
+  import Logo from "$lib/components/common/Logo.svelte";
 
   const items: { view: View; label: string; icon: typeof iconBrowse }[] = [
     { view: "browse", label: "Browse", icon: iconBrowse },
@@ -58,7 +59,7 @@
 {/snippet}
 
 <nav class="rail" aria-label="Main">
-  <div class="brand m3-font-title-large" aria-hidden="true">Ts</div>
+  <Logo />
 
   <div class="dests">
     {#each items as item (item.view)}
@@ -94,20 +95,6 @@
     height: 100%;
     padding: 16px 0 12px;
     gap: 24px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: var(--m3-shape-large);
-    background: var(--m3c-primary);
-    color: var(--m3c-on-primary);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    font-variation-settings: "opsz" 48;
-    user-select: none;
   }
   .dests,
   .bottom {

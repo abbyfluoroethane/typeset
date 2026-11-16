@@ -4,7 +4,6 @@
   import iconClose from "@ktibow/iconset-material-symbols/close";
   import iconDelete from "@ktibow/iconset-material-symbols/delete";
   import iconEdit from "@ktibow/iconset-material-symbols/edit";
-  import iconFolder from "@ktibow/iconset-material-symbols/folder";
   import iconFolderOpen from "@ktibow/iconset-material-symbols/folder-open";
   import iconCreate from "@ktibow/iconset-material-symbols/create-new-folder";
   import { parseKey, type Collection } from "$lib/api";
@@ -85,11 +84,11 @@
 <div class="flex h-full flex-col">
   <PageHeader title="Collections">
     {#snippet summary()}
-      {plural(sorted.length, "collection", "collections")} · {plural(totalFamilies, "family", "families")} organized
+      {plural(sorted.length, "collection", "collections")}, {plural(totalFamilies, "family", "families")}
     {/snippet}
     {#snippet actions()}
-      <Button variant="filled" size="m" iconType="left" onclick={startCreate}>
-        <Icon icon={iconAdd} /> New collection
+      <Button variant="filled" size="s" iconType="left" onclick={startCreate}>
+        <Icon icon={iconAdd} size={20} /> New collection
       </Button>
     {/snippet}
   </PageHeader>
@@ -106,16 +105,13 @@
               onclick={() => show(c)}
             >
               <div class="flex items-center gap-3 pr-10">
-                <div class="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary-container text-on-secondary-container">
-                  <Icon icon={iconFolder} size={22} />
-                </div>
                 <div class="min-w-0">
                   <h2 class="m3-font-title-medium truncate text-on-surface">{c.name}</h2>
                   <p class="m3-font-body-medium text-on-surface-variant">{count(c)}</p>
                 </div>
               </div>
               {#if c.familyKeys.length > 0}
-                <div class="flex flex-col gap-1 border-t border-outline-variant pt-3">
+                <div class="flex flex-col gap-1">
                   {#each c.familyKeys.slice(0, 3) as k (k)}
                     <div class="flex min-w-0 items-center gap-2">
                       <FontText url={fontUrl(k)} text={famName(k)} size={18} class="min-w-0 text-on-surface" />
@@ -129,7 +125,7 @@
                   {/if}
                 </div>
               {:else}
-                <p class="m3-font-body-medium border-t border-outline-variant pt-3 text-on-surface-variant">
+                <p class="m3-font-body-medium text-on-surface-variant">
                   Empty. Add families from Browse.
                 </p>
               {/if}

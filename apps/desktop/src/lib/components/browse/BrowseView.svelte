@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { Button, Chip, Icon, Select, TextFieldOutlined } from "m3-svelte";
-  import iconSearch from "@ktibow/iconset-material-symbols/search";
-  import iconClose from "@ktibow/iconset-material-symbols/close";
+  import { Button, Icon, Select } from "m3-svelte";
   import iconRefresh from "@ktibow/iconset-material-symbols/refresh";
   import iconText from "@ktibow/iconset-material-symbols/text-fields";
   import iconTune from "@ktibow/iconset-material-symbols/tune";
@@ -11,6 +9,9 @@
   import { app } from "$lib/state.svelte";
   import PageHeader from "$lib/components/common/PageHeader.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
+  import SearchField from "$lib/components/common/SearchField.svelte";
+  import FilterChips from "$lib/components/common/FilterChips.svelte";
+  import IconButton from "./IconButton.svelte";
   import FamilyCard from "./FamilyCard.svelte";
   import SizeControl from "./SizeControl.svelte";
   import { prettyCategory } from "./helpers";
@@ -59,8 +60,10 @@
   const shown = $derived(results.slice(0, limit));
   const filtered = $derived(search.trim() !== "" || category !== "all" || subset !== "all");
   const activeExtra = $derived((subset !== "all" ? 1 : 0) + (sort !== "popularity" ? 1 : 0));
-  const clearable = (v: string, clear: () => void) =>
-    v ? { icon: iconClose, "aria-label": "Clear", onclick: clear } : undefined;
+  const categoryOptions = $derived([
+    { id: "all", label: "All" },
+    ...categories.map((c) => ({ id: c, label: prettyCategory(c) })),
+  ]);
 
   function clearFilters() {
     search = "";
@@ -92,39 +95,30 @@
       </span>
     {/snippet}
     {#snippet actions()}
-      <Button variant="text" size="s" iconType="left" disabled={app.catalogLoading} onclick={() => app.loadCatalog(true)}>
-        <Icon icon={iconRefresh} size={20} /> Refresh catalog
-      </Button>
+      <IconButton
+        icon={iconRefresh}
+        label="Refresh the catalog from Google Fonts"
+        disabled={app.catalogLoading}
+        onclick={() => app.loadCatalog(true)}
+      />
     {/snippet}
     {#snippet toolbar()}
       <div class="row">
-        <div class="field grow">
-          <TextFieldOutlined
-            label="Search families"
-            leadingIcon={iconSearch}
-            bind:value={search}
-            trailing={clearable(search, () => (search = ""))}
-          />
-        </div>
-        <div class="field grow">
-          <TextFieldOutlined
-            label="Preview text"
-            leadingIcon={iconText}
-            bind:value={app.previewText}
-            trailing={clearable(app.previewText, () => (app.previewText = ""))}
-          />
+        <div class="grow"><SearchField label="Search families" bind:value={search} /></div>
+        <div class="grow">
+          <SearchField label="Type your own preview text" icon={iconText} type="text" bind:value={app.previewText} />
         </div>
         <SizeControl bind:value={size} options={SIZES} />
         <div class="filters" bind:this={filtersEl}>
           <Button
-            variant={activeExtra ? "tonal" : "outlined"}
+            variant={activeExtra ? "tonal" : "text"}
             size="s"
             iconType="left"
             aria-haspopup="dialog"
             aria-expanded={filtersOpen}
             onclick={() => (filtersOpen = !filtersOpen)}
           >
-            <Icon icon={iconTune} size={20} /> Filters{activeExtra ? ` · ${activeExtra}` : ""}
+            <Icon icon={iconTune} size={20} /> {activeExtra ? `Filters (${activeExtra})` : "Filters"}
           </Button>
           {#if filtersOpen}
             <div class="popover" role="dialog" aria-label="Subset and sort">
@@ -159,14 +153,7 @@
           {/if}
         </div>
       </div>
-      <div class="chips" role="group" aria-label="Category">
-        <Chip variant="general" selected={category === "all"} onclick={() => (category = "all")}>All</Chip>
-        {#each categories as c (c)}
-          <Chip variant="general" selected={category === c} onclick={() => (category = c)}>
-            {prettyCategory(c)}
-          </Chip>
-        {/each}
-      </div>
+      <FilterChips label="Category" options={categoryOptions} bind:value={category} />
     {/snippet}
   </PageHeader>
 
@@ -233,18 +220,9 @@
     gap: 0.75rem;
     width: 100%;
   }
-  .field {
-    min-width: 14rem;
-  }
   .grow {
-    flex: 1 1 14rem;
-    max-width: 26rem;
-  }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    width: 100%;
+    flex: 1 1 13rem;
+    max-width: 24rem;
   }
   .filters {
     position: relative;
@@ -263,7 +241,6 @@
     background-color: var(--m3c-surface-container-high);
     box-shadow: var(--m3-elevation-3);
   }
-  .field :global(.m3-container),
   .popover :global(.m3-container) {
     width: 100%;
   }
@@ -284,7 +261,6 @@
     padding: 1.25rem;
     border-radius: var(--m3-shape-large);
     background-color: var(--m3c-surface-container-low);
-    border: 1px solid var(--m3c-outline-variant);
   }
   .bar {
     height: 2rem;

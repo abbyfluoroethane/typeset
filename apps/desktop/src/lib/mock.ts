@@ -21,8 +21,10 @@ const now = () => Math.floor(Date.now() / 1000);
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 
 let rev = 0;
-let user: User | null = { id: "mock", email: "you@example.com", name: "Mock User" };
-let settings: Settings = { serverUrl: "https://fonts.example.com", autoInstall: true };
+// Open the page with ?signedout to start on the sign-in screen.
+const signedOut = new URLSearchParams(globalThis.location?.search).has("signedout");
+let user: User | null = signedOut ? null : { id: "mock", email: "you@example.com", name: "Mock User" };
+let settings: Settings = { serverUrl: signedOut ? "" : "https://fonts.example.com", autoInstall: true };
 let lastSyncedAt: number | null = null;
 let catalog: CatalogResponse | null = null;
 const library = new Map<string, LibraryEntry>();

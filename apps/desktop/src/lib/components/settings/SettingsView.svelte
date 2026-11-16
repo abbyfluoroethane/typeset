@@ -55,7 +55,7 @@
         <div class="row stack">
           <div class="text">
             <p class="m3-font-body-large" id="seed-label">Accent color</p>
-            <p class="m3-font-body-medium text-on-surface-variant">Tints buttons, highlights and surfaces.</p>
+            <p class="m3-font-body-medium text-on-surface-variant">Colors buttons and highlights, with a faint tint on everything else.</p>
           </div>
           <div class="flex flex-wrap items-center gap-3 p-1" role="radiogroup" aria-labelledby="seed-label">
             {#each SEED_PRESETS as p (p.color)}

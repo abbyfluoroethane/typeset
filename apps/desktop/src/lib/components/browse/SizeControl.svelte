@@ -30,21 +30,19 @@
     display: inline-flex;
     flex-shrink: 0;
     height: 2.5rem;
-    border: 1px solid var(--m3c-outline);
+    padding: 0.25rem;
     border-radius: 9999px;
-    overflow: hidden;
+    background-color: var(--m3c-surface-container-high);
   }
   button {
-    min-width: 2.5rem;
-    padding: 0 0.75rem;
+    min-width: 2.25rem;
+    padding: 0 0.625rem;
     border: 0;
+    border-radius: 9999px;
     background: transparent;
-    color: var(--m3c-on-surface);
+    color: var(--m3c-on-surface-variant);
     cursor: pointer;
     transition: background-color 150ms ease;
-  }
-  button + button {
-    border-left: 1px solid var(--m3c-outline-variant);
   }
   button:hover:not(.on) {
     background-color: color-mix(in srgb, var(--m3c-on-surface) 8%, transparent);

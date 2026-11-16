@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button, Icon } from "m3-svelte";
+  import IconButton from "$lib/components/browse/IconButton.svelte";
   import iconFavorite from "@ktibow/iconset-material-symbols/favorite";
   import iconFavoriteOutline from "@ktibow/iconset-material-symbols/favorite-outline";
   import iconDownload from "@ktibow/iconset-material-symbols/download";
@@ -81,18 +82,10 @@
     aria-label="Open details for {name}"
     onclick={() => app.openDetail(familyKey)}
   >
-    {#if isUpload}
-      <div
-        class="m3-font-title-large grid size-12 shrink-0 place-items-center rounded-lg bg-secondary-container text-on-secondary-container"
-        aria-hidden="true"
-      >
-        {name.charAt(0).toUpperCase()}
-      </div>
-    {/if}
     <div class="min-w-0 flex-1">
       <div class="flex min-w-0 items-center gap-2">
         {#if isUpload}
-          <div class="m3-font-title-large min-w-0 truncate text-on-surface">{name}</div>
+          <div class="upload-name min-w-0 truncate text-on-surface">{name}</div>
         {:else}
           <FontText {url} text={name} size={26} class="min-w-0 text-on-surface" />
         {/if}
@@ -103,34 +96,23 @@
   </button>
 
   {#if installed}
-    <span
-      class="m3-font-label-large inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-container py-1 pr-3 pl-2 text-on-primary-container"
-    >
-      <Icon icon={iconCheck} size={16} /> Installed
+    <span class="m3-font-label-large inline-flex shrink-0 items-center gap-1 pr-2 text-on-surface-variant">
+      <Icon icon={iconCheck} size={18} /> Installed
     </span>
   {:else}
-    <span class="m3-font-label-large hidden shrink-0 text-on-surface-variant md:inline">
-      Not installed
-    </span>
     <Button variant="tonal" size="s" iconType="left" disabled={busy} onclick={() => app.install(familyKey)}>
       <Icon icon={iconDownload} /> Install
     </Button>
   {/if}
 
   {#if entry}
-    <Button
-      variant="text"
-      iconType="full"
-      aria-label={entry.favorite ? `Remove ${name} from favorites` : `Favorite ${name}`}
-      aria-pressed={entry.favorite}
+    <IconButton
+      icon={entry.favorite ? iconFavorite : iconFavoriteOutline}
+      label={entry.favorite ? `Remove ${name} from favorites` : `Add ${name} to favorites`}
+      pressed={entry.favorite}
+      accent="error"
       onclick={() => app.toggleFavorite(familyKey)}
-    >
-      <Icon
-        icon={entry.favorite ? iconFavorite : iconFavoriteOutline}
-        size={24}
-        class={entry.favorite ? "text-tertiary" : ""}
-      />
-    </Button>
+    />
   {/if}
   <OverflowMenu items={menu} label="More actions for {name}" />
 </div>
@@ -139,5 +121,10 @@
   .row {
     min-height: 4.5rem;
     padding-block: 0.25rem;
+  }
+  /* Uploaded fonts are not loaded for preview, so match the specimen size. */
+  .upload-name {
+    font-size: 26px;
+    line-height: 1.2;
   }
 </style>

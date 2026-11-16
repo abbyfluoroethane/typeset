@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { Button, Chip, Dialog, Icon, LoadingIndicator } from "m3-svelte";
-  import iconSync from "@ktibow/iconset-material-symbols/sync";
+  import { Button, Dialog } from "m3-svelte";
   import iconFavorite from "@ktibow/iconset-material-symbols/favorite";
   import iconFavoriteOutline from "@ktibow/iconset-material-symbols/favorite-outline";
   import iconLibrary from "@ktibow/iconset-material-symbols/library-books";
   import iconSearch from "@ktibow/iconset-material-symbols/search";
-  import iconClose from "@ktibow/iconset-material-symbols/close";
   import iconCloudOff from "@ktibow/iconset-material-symbols/cloud-off";
   import iconDelete from "@ktibow/iconset-material-symbols/delete";
   import { parseKey } from "$lib/api";
   import { app } from "$lib/state.svelte";
   import PageHeader from "$lib/components/common/PageHeader.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
+  import SearchField from "$lib/components/common/SearchField.svelte";
+  import FilterChips from "$lib/components/common/FilterChips.svelte";
   import FamilyRow from "./FamilyRow.svelte";
 
   type Filter = "all" | "favorites" | "not-installed";
@@ -56,11 +56,11 @@
         : "Not synced yet",
   );
 
-  const filters: { id: Filter; label: string }[] = [
+  const filters = $derived<{ id: Filter; label: string; icon?: typeof iconFavorite }[]>([
     { id: "all", label: "All" },
-    { id: "favorites", label: "Favorites" },
+    { id: "favorites", label: "Favorites", icon: filter === "favorites" ? iconFavorite : iconFavoriteOutline },
     { id: "not-installed", label: "Not installed" },
-  ];
+  ]);
 
   // Confirmations for the two destructive row actions.
   let confirmKind = $state<"uninstall" | "remove" | null>(null);
@@ -88,44 +88,12 @@
   <PageHeader title="Library">
     {#snippet summary()}
       <span aria-live="polite"
-        >{total} {total === 1 ? "family" : "families"} · {installedCount} installed on this Mac · {syncText}</span
+        >{total} {total === 1 ? "family" : "families"}, {installedCount} installed on this Mac. {syncText}.</span
       >
     {/snippet}
-    {#snippet actions()}
-      <Button variant="tonal" size="m" iconType="left" disabled={app.syncing} onclick={() => app.sync()}>
-        {#if app.syncing}
-          <LoadingIndicator size={24} center={false} aria-label="Syncing" />
-        {:else}
-          <Icon icon={iconSync} />
-        {/if}
-        {app.syncing ? "Syncing…" : "Sync now"}
-      </Button>
-    {/snippet}
     {#snippet toolbar()}
-      {#each filters as f (f.id)}
-        <Chip
-          variant="general"
-          selected={filter === f.id}
-          aria-pressed={filter === f.id}
-          icon={f.id === "favorites" ? (filter === f.id ? iconFavorite : iconFavoriteOutline) : undefined}
-          onclick={() => (filter = f.id)}>{f.label}</Chip
-        >
-      {/each}
-      <div class="search ml-auto">
-        <Icon icon={iconSearch} size={20} />
-        <input
-          type="search"
-          class="m3-font-body-large"
-          placeholder="Search library"
-          aria-label="Search library"
-          bind:value={query}
-        />
-        {#if query}
-          <button type="button" class="clear" aria-label="Clear search" onclick={() => (query = "")}>
-            <Icon icon={iconClose} size={18} />
-          </button>
-        {/if}
-      </div>
+      <FilterChips label="Show" options={filters} bind:value={filter} />
+      <div class="ml-auto w-64"><SearchField label="Search library" bind:value={query} /></div>
     {/snippet}
   </PageHeader>
 
@@ -195,43 +163,3 @@
     </span>
   {/snippet}
 </Dialog>
-
-<style>
-  .search {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    height: 2.5rem;
-    min-width: 14rem;
-    padding: 0 0.75rem;
-    border-radius: 9999px;
-    background-color: var(--m3c-surface-container-high);
-    color: var(--m3c-on-surface-variant);
-  }
-  .search:focus-within {
-    outline: 2px solid var(--m3c-primary);
-  }
-  .search input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--m3c-on-surface);
-  }
-  .search input::-webkit-search-cancel-button {
-    display: none;
-  }
-  .clear {
-    display: grid;
-    place-items: center;
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    border-radius: 9999px;
-  }
-  .clear:focus-visible {
-    outline: 2px solid var(--m3c-primary);
-  }
-</style>
