@@ -2,7 +2,7 @@
 
 A font manager that keeps the same fonts installed on all your machines.
 
-- **Desktop app** (`apps/desktop`): Tauri 2, SvelteKit + Svelte 5, Tailwind 4, shadcn-svelte. Browse Google Fonts, build a library and collections, install fonts into your user font folder.
+- **Desktop app** (`apps/desktop`): Tauri 2, SvelteKit + Svelte 5, Tailwind 4, m3-svelte (Material 3). Browse Google Fonts, build a library and collections, install fonts into your user font folder.
 - **Server** (`crates/server`): Rust, Axum, SQLite (sqlx). Syncs library metadata between devices, proxies the Google Fonts catalog, stores fonts you upload. Sign-in uses your own OIDC provider.
 - **Shared types** (`crates/core`): wire types used by both.
 
