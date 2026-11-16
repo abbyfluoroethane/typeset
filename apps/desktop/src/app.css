@@ -1,0 +1,87 @@
+@import "tailwindcss";
+@import "m3-svelte/etc/styles.css";
+@import "m3-svelte/etc/tailwind-styles.css";
+@import "m3-svelte/etc/recommended-styles.css";
+/* Material 3 (Tonal Spot) palette computed in CSS from one seed color, so
+   the whole UI recolors when --m3v-source changes (see $lib/theme.svelte.ts).
+   Tonal Spot keeps surfaces close to neutral and saves the colour for
+   selection and the main actions. */
+@import "m3-svelte/etc/livetheme/tonalspot2025.css";
+@import "@fontsource-variable/google-sans-flex/opsz.css";
+
+/* Component sizing hook m3-svelte expects the app to define (normally part of
+   the theme snippet). -1 density = slightly compact, suited to desktop. */
+@function --m3-density(--size) {
+  result: calc(var(--size) - 0.25rem);
+}
+
+:root {
+  --m3v-source: #7c4dff;
+  /* Palette tokens use light-dark(), so this follows the OS setting. */
+  color-scheme: light dark;
+}
+:root[data-scheme="light"] {
+  color-scheme: light;
+}
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--m3c-surface);
+  color: var(--m3c-on-surface);
+  font-family: var(--m3-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* m3-svelte text fields rest their label where the placeholder goes, so a
+   real placeholder would sit under the label. Show it only while the field
+   has focus, when the label has moved up. */
+.m3-container input:not(:focus)::placeholder {
+  color: transparent;
+}
+
+/* Popup menus (card and row "more" menus) sit on a clearly lighter surface
+   with a hairline and a shadow, so they stand off whatever is behind them. */
+[role="menu"][data-family-menu],
+[role="menu"][data-overflow-menu] {
+  border-radius: var(--m3-shape-medium);
+  background-color: var(--m3c-surface-container-highest);
+  box-shadow:
+    0 0 0 1px var(--m3c-outline-variant),
+    0 12px 32px -8px color-mix(in srgb, var(--m3c-scrim) 55%, transparent);
+}
+[role="menu"][data-family-menu] > .m3-container,
+[role="menu"][data-overflow-menu] > .m3-container {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+/* Tone wrappers: remap the color roles m3-svelte components read, for
+   everything inside. m3 components take no color prop (and `class` replaces
+   their own classes), so wrap them instead:
+     <span class="tone-error"><Button variant="tonal">Delete</Button></span>
+   `filled` reads primary/on-primary, `tonal` reads secondary-container. */
+.tone-error,
+.tone-tertiary,
+.tone-primary {
+  display: contents;
+}
+.tone-error {
+  --m3c-primary: var(--m3c-error);
+  --m3c-on-primary: var(--m3c-on-error);
+  --m3c-secondary-container: var(--m3c-error-container);
+  --m3c-on-secondary-container: var(--m3c-on-error-container);
+  --m3c-on-surface-variant: var(--m3c-error);
+}
+.tone-tertiary {
+  --m3c-primary: var(--m3c-tertiary);
+  --m3c-on-primary: var(--m3c-on-tertiary);
+  --m3c-secondary-container: var(--m3c-tertiary-container);
+  --m3c-on-secondary-container: var(--m3c-on-tertiary-container);
+}
+.tone-primary {
+  --m3c-secondary-container: var(--m3c-primary-container);
+  --m3c-on-secondary-container: var(--m3c-on-primary-container);
+}
