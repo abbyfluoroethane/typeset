@@ -84,10 +84,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: bundle
+          cache-on-failure: true
       - run: pnpm install --frozen-lockfile
       # The mock backend imports a gitignored catalog snapshot.
       - run: echo '{"fetchedAt":0,"families":[]}' > src/lib/mock-catalog.json
-      # tauri.glass.conf.json adds the glass icon to the normal icon list.
+      # Tauri can compile a .icon itself, but its actool call crashes
+      # (tauri-apps/tauri#15315), so compile it here and hand over the result.
+      # Tauri expects the icon inside to be named "Icon".
+      - name: Compile the glass icon
+        run: |
+          work=$(mktemp -d)
+          cp -R src-tauri/icons/AppIcon.icon "$work/Icon.icon"
+          xcrun actool "$work/Icon.icon" --compile "$work" --app-icon Icon \
+            --platform macosx --target-device mac --minimum-deployment-target 26.0 \
+            --output-format human-readable-text --output-partial-info-plist "$work/partial.plist" \
+            --errors --warnings --notices </dev/null
+          ls -la "$work"
+          cp "$work/Assets.car" src-tauri/icons/Assets.car
+      # tauri.glass.conf.json adds the compiled icon to the normal icon list.
       - run: pnpm tauri build --config src-tauri/tauri.glass.conf.json
       - name: Check that the glass icon is in the app
         working-directory: target/release/bundle/macos/Typeset.app/Contents

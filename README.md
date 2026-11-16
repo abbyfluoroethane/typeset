@@ -64,7 +64,7 @@ On first launch, enter your server URL and sign in. The app opens your browser f
 
 `pnpm tauri build` builds the app bundle into `target/release/bundle/`.
 
-The macOS 26 glass icon needs Xcode 26 or newer to compile, so it lives in a separate config: `pnpm tauri build --config src-tauri/tauri.glass.conf.json`. CI builds the app this way on every push and attaches the `.dmg` to the run.
+The macOS 26 glass icon needs Xcode 26 or newer to compile, so it is built by CI: the `macOS app` job compiles `src-tauri/icons/AppIcon.icon`, builds with `src-tauri/tauri.glass.conf.json`, and attaches the `.dmg` to the run.
 
 ## Development
 

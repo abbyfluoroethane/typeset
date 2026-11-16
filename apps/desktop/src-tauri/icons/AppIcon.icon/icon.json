@@ -7,6 +7,7 @@
       "layers" : [
         {
           "glass" : true,
+          "hidden" : false,
           "image-name" : "Ts.png",
           "name" : "Ts"
         }
