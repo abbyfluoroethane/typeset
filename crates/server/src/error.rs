@@ -13,8 +13,12 @@ pub enum AppError {
     BadRequest(String),
     #[error("unauthorized")]
     Unauthorized,
+    #[error("forbidden")]
+    Forbidden,
     #[error("not found")]
     NotFound,
+    #[error("this server is not set up yet; open it in a browser to finish setup")]
+    NotConfigured,
     #[error("{0}")]
     PayloadTooLarge(String),
     #[error("upstream error: {0}")]
@@ -32,7 +36,9 @@ impl IntoResponse for AppError {
         let status = match &self {
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::NotConfigured => StatusCode::SERVICE_UNAVAILABLE,
             AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             AppError::Upstream(_) => StatusCode::BAD_GATEWAY,
             AppError::Db(_) | AppError::Io(_) | AppError::Internal(_) => {
@@ -40,7 +46,7 @@ impl IntoResponse for AppError {
             }
         };
         // Don't leak internal details to clients.
-        let message = if status.is_server_error() && status != StatusCode::BAD_GATEWAY {
+        let message = if status == StatusCode::INTERNAL_SERVER_ERROR {
             tracing::error!(error = %self, "request failed");
             "internal server error".to_owned()
         } else {

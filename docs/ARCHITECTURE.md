@@ -33,6 +33,21 @@ The server is the only OIDC client. The desktop app never talks to the identity 
 
 Sessions last 90 days and renew while in use. The server stores only SHA-256 hashes of codes and tokens. It accepts only loopback redirect URIs.
 
+## Setup and admin page
+
+The server serves one web page at `/admin` (three static files compiled into the binary, no build step). It has two jobs.
+
+**Setup.** The public URL, the OIDC client and the Google Fonts key are settings. Each comes from its `TYPESET_*` environment variable if that is set, otherwise from the `settings` table. The server starts without them: sign-in and the catalog answer 503, and the page shows a setup form.
+
+- Setup is open while the server is not configured or has no admin. At startup in that state, the server makes a random setup token, logs it, and keeps only its hash in memory.
+- The page accepts the token by link (`/setup?token=…`) or by paste, and keeps it in an HttpOnly cookie. Reading the server log is the proof that you run the server.
+- Saving tests the issuer (OIDC discovery) and the key (a catalog fetch) when they change, and rejects values that fail. New settings apply at once.
+- The user who signs in from the setup page becomes the first admin. After that the token is worth nothing.
+
+**Admin.** Admins sign in through the same IdP round trip as the desktop app. The pending login is marked `web`, so `/auth/callback` ends with a session cookie (7 days, `SameSite=Lax`) and a redirect to `/admin`, not a one-time code. Admins can change settings, make other users admins, delete users with their data, sign devices out and refresh the catalog. An admin cannot demote or delete their own account, so one admin always remains.
+
+Every state change is a JSON `POST`, `PUT` or `DELETE`. `SameSite=Lax` keeps the cookies off cross-site requests of those kinds. The page's content security policy allows only its own script and stylesheet.
+
 ## Sync
 
 - Every write on the server takes the next value from one global counter (`rev`).
@@ -58,6 +73,7 @@ The app installs fonts into the user's font folder, so it needs no admin rights.
 | Server table | Contents |
 | --- | --- |
 | `users`, `sessions`, `pending_logins`, `auth_codes` | Auth |
+| `settings` | Settings saved from the setup page |
 | `library_entries`, `collections`, `uploads` | Synced user data, with `rev` and tombstones |
 | `rev_counter` | The global revision counter |
 | `catalog_cache` | Last Google Fonts catalog (metadata JSON) |

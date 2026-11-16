@@ -23,8 +23,6 @@ use crate::{
     state::AppState,
 };
 
-const GOOGLE_URL: &str = "https://www.googleapis.com/webfonts/v1/webfonts";
-
 /// Held while refreshing so concurrent requests don't all hit Google.
 static REFRESH_LOCK: Mutex<()> = Mutex::const_new(());
 
@@ -59,6 +57,11 @@ async fn get_catalog(
     let ttl = state.config.catalog_ttl_secs;
     let is_fresh = |row: &CacheRow| now() - row.fetched_at < ttl;
 
+    let settings = state.settings();
+    if !settings.is_configured() {
+        return Err(AppError::NotConfigured);
+    }
+
     let cached = read_cache(&state).await?;
     if let Some(row) = &cached
         && !refresh
@@ -81,24 +84,13 @@ async fn get_catalog(
         }
     }
 
-    match fetch_catalog(&state.config.google_fonts_api_key).await {
-        Ok(families) => {
-            let resp = CatalogResponse {
-                fetched_at: now(),
-                families,
-            };
-            let body = serde_json::to_string(&resp)
-                .map_err(|e| AppError::Internal(format!("serialize catalog: {e}")))?;
-            sqlx::query(
-                "INSERT INTO catalog_cache (id, fetched_at, body) VALUES (1, ?, ?)
-                 ON CONFLICT(id) DO UPDATE SET fetched_at = excluded.fetched_at, body = excluded.body",
-            )
-            .bind(resp.fetched_at)
-            .bind(&body)
-            .execute(&state.db)
-            .await?;
-            Ok(json_response(body))
-        }
+    match fetch_catalog(
+        &state.config.google_fonts_url,
+        &settings.google_fonts_api_key,
+    )
+    .await
+    {
+        Ok(families) => Ok(json_response(store_catalog(&state, families).await?)),
         Err(e) => match cached {
             Some(row) => {
                 tracing::warn!("google fonts fetch failed, serving stale catalog: {e}");
@@ -107,6 +99,38 @@ async fn get_catalog(
             None => Err(AppError::Upstream(e)),
         },
     }
+}
+
+/// Saves a freshly fetched catalog and returns its JSON body.
+pub async fn store_catalog(state: &AppState, families: Vec<CatalogFamily>) -> AppResult<String> {
+    let resp = CatalogResponse {
+        fetched_at: now(),
+        families,
+    };
+    let body = serde_json::to_string(&resp)
+        .map_err(|e| AppError::Internal(format!("serialize catalog: {e}")))?;
+    sqlx::query(
+        "INSERT INTO catalog_cache (id, fetched_at, body) VALUES (1, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET fetched_at = excluded.fetched_at, body = excluded.body",
+    )
+    .bind(resp.fetched_at)
+    .bind(&body)
+    .execute(&state.db)
+    .await?;
+    Ok(body)
+}
+
+/// Refetches the catalog from Google now and returns the family count.
+/// Used by the admin page.
+pub async fn refresh_now(state: &AppState) -> AppResult<usize> {
+    let _guard = REFRESH_LOCK.lock().await;
+    let key = state.settings().google_fonts_api_key.clone();
+    let families = fetch_catalog(&state.config.google_fonts_url, &key)
+        .await
+        .map_err(AppError::Upstream)?;
+    let count = families.len();
+    store_catalog(state, families).await?;
+    Ok(count)
 }
 
 async fn read_cache(state: &AppState) -> AppResult<Option<CacheRow>> {
@@ -177,13 +201,13 @@ fn map_item(item: GoogleItem) -> CatalogFamily {
 
 /// Fetches the catalog in popularity order. Errors are plain strings that
 /// never contain the API key.
-async fn fetch_catalog(api_key: &str) -> Result<Vec<CatalogFamily>, String> {
+pub async fn fetch_catalog(url: &str, api_key: &str) -> Result<Vec<CatalogFamily>, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| e.without_url().to_string())?;
     let resp = client
-        .get(GOOGLE_URL)
+        .get(url)
         .query(&[("key", api_key), ("sort", "popularity")])
         .send()
         .await

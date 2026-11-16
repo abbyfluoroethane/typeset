@@ -13,16 +13,30 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 ## Running the server
 
 ```sh
-cp .env.example .env   # then fill in the OIDC and Google Fonts values
+cp .env.example .env
 set -a; source .env; set +a
 cargo run -p typeset-server
 ```
 
-In your identity provider, create an OIDC client with redirect URI `<TYPESET_PUBLIC_URL>/auth/callback` and scopes `openid email profile`.
+Then open the server in a browser to finish setup:
+
+1. The server prints a setup link with a one-time token to its log each time it starts unconfigured. Open that link, or open the server's address and paste the token.
+2. The setup page shows the callback URL to register with your identity provider (scopes `openid email profile`). It takes the issuer URL, the client ID and a Google Fonts API key, and tests them before it saves.
+3. Sign in from the setup page. That account becomes the server's admin.
+
+After setup, the same address is the admin page: people, signed-in devices, upload storage, the catalog and the settings. Changes apply without a restart.
+
+You can also set any of these values as environment variables (see `.env.example`). A value from the environment wins, and the page shows it as read-only.
+
+If the only admin loses access, clear the flag and restart to get a new setup token:
+
+```sh
+sqlite3 data/typeset.db "UPDATE users SET is_admin = 0"
+```
 
 ## Deploying the server
 
-`deploy/deploy.sh [ssh-host]` cross-compiles a static `aarch64-unknown-linux-musl` binary and installs it on a Linux host as the systemd service in `deploy/typeset.service`. The service runs as a dynamic user, keeps its data in `/var/lib/typeset`, and reads its config from `/etc/typeset/typeset.env`. Put TLS in front of it with a reverse proxy such as Caddy.
+`deploy/deploy.sh [ssh-host]` cross-compiles a static `aarch64-unknown-linux-musl` binary and installs it on a Linux host as the systemd service in `deploy/typeset.service`. The service runs as a dynamic user, keeps its data in `/var/lib/typeset`, and reads its config from `/etc/typeset/typeset.env`. Put TLS in front of it with a reverse proxy such as Caddy. On a new host, get the setup link with `sudo journalctl -u typeset | grep setup`.
 
 ```sh
 brew install zig && cargo install cargo-zigbuild
