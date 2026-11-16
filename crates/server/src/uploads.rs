@@ -25,7 +25,7 @@ use crate::{
     sync::{UPLOAD_COLS, UploadRow},
 };
 
-pub fn router(config: &Config) -> Router<AppState> {
+pub fn router(max_upload_bytes: usize) -> Router<AppState> {
     // POST   /api/uploads              multipart field `file` -> Upload
     //        (also adds/undeletes the `upload:<family>` library entry)
     // GET    /api/uploads/{id}/file    -> font bytes
@@ -34,7 +34,7 @@ pub fn router(config: &Config) -> Router<AppState> {
         .route("/api/uploads", post(create_upload))
         .route("/api/uploads/{id}", axum::routing::delete(delete_upload))
         .route("/api/uploads/{id}/file", get(get_upload_file))
-        .layer(DefaultBodyLimit::max(config.max_upload_bytes))
+        .layer(DefaultBodyLimit::max(max_upload_bytes))
 }
 
 /// What we read out of a font file.

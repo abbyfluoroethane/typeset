@@ -5,7 +5,8 @@
 #
 # Needs: zig, cargo-zigbuild, `rustup target add aarch64-unknown-linux-musl`.
 # The host needs passwordless sudo. /etc/typeset/typeset.env is created from
-# .env.example on first deploy and never overwritten afterwards.
+# .env.example on first deploy and never overwritten afterwards. A new server
+# starts in setup mode: open it in a browser with the link from its log.
 #
 # PULL_FROM=<this machine's LAN IP> makes the host download the files from a
 # temporary HTTP server here instead of receiving them over scp (useful when
@@ -50,7 +51,8 @@ ssh "$HOST" 'set -euo pipefail
   if ! sudo test -f /etc/typeset/typeset.env; then
     sudo install -d -m 0750 /etc/typeset
     sudo install -m 0600 /tmp/env.example /etc/typeset/typeset.env
-    echo "    created /etc/typeset/typeset.env from .env.example; edit it, then rerun"
+    echo "    created /etc/typeset/typeset.env from .env.example"
+    echo "    finish setup in a browser: sudo journalctl -u typeset | grep setup"
   fi
   rm -f /tmp/typeset-server /tmp/typeset.service /tmp/env.example
   sudo systemctl daemon-reload

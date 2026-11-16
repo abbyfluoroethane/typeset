@@ -11,6 +11,10 @@
 //!    loopback `redirect_uri?code=<code>&state=<s>`.
 //! 4. Client calls `POST /auth/token` with the code and its PKCE verifier
 //!    and receives a long-lived bearer token.
+//!
+//! The web admin page signs in through the same IdP round trip (see
+//! `begin_login`), but step 3 ends with a session cookie and a redirect to
+//! `/admin` instead of a one-time code.
 
 use std::{
     fmt::Write as _,
@@ -20,7 +24,7 @@ use std::{
 use axum::{
     Json, Router,
     extract::{FromRequestParts, Query, State},
-    http::{StatusCode, header, request::Parts},
+    http::{HeaderMap, HeaderValue, StatusCode, header, request::Parts},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
@@ -41,9 +45,9 @@ use tokio::sync::Mutex;
 use typeset_core::{TokenRequest, TokenResponse, User};
 
 use crate::{
-    config::Config,
     db,
     error::{AppError, AppResult},
+    settings::Settings,
     state::AppState,
 };
 
@@ -54,6 +58,17 @@ const AUTH_CODE_TTL_SECS: i64 = 60;
 const SESSION_TTL_SECS: i64 = 90 * 24 * 60 * 60;
 /// Sessions are only touched in the database this often.
 const SESSION_TOUCH_SECS: i64 = 60 * 60;
+/// Admin page sessions are shorter and do not renew.
+const WEB_SESSION_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+
+/// Cookie that holds the admin page's session token.
+pub const SESSION_COOKIE: &str = "typeset_session";
+
+/// `pending_logins.kind` values.
+pub const KIND_DESKTOP: &str = "desktop";
+pub const KIND_WEB: &str = "web";
+/// A web login that also makes the user the first admin.
+pub const KIND_WEB_CLAIM: &str = "web-claim";
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -143,25 +158,21 @@ fn http_client() -> &'static reqwest::Client {
 }
 
 /// Returns the cached client, discovering the provider on first use.
-async fn oidc_client(config: &Config) -> AppResult<Arc<OidcClient>> {
+async fn oidc_client(settings: &Settings) -> AppResult<Arc<OidcClient>> {
+    if !settings.is_configured() {
+        return Err(AppError::NotConfigured);
+    }
     let mut slot = OIDC_CLIENT.lock().await;
     if let Some(client) = &*slot {
         return Ok(client.clone());
     }
-    let upstream = |what: &str, e: &dyn std::error::Error| {
-        AppError::Upstream(format!("OIDC {what}: {}", error_chain(e)))
-    };
-    let issuer = IssuerUrl::new(config.oidc_issuer.clone())
-        .map_err(|e| AppError::Internal(format!("invalid TYPESET_OIDC_ISSUER: {e}")))?;
-    let metadata = CoreProviderMetadata::discover_async(issuer, http_client())
-        .await
-        .map_err(|e| upstream("discovery failed", &e))?;
-    let redirect = RedirectUrl::new(config.redirect_uri())
+    let metadata = discover(&settings.oidc_issuer).await?;
+    let redirect = RedirectUrl::new(settings.redirect_uri())
         .map_err(|e| AppError::Internal(format!("invalid redirect URI: {e}")))?;
     let client = CoreClient::from_provider_metadata(
         metadata,
-        ClientId::new(config.oidc_client_id.clone()),
-        config.oidc_client_secret.clone().map(ClientSecret::new),
+        ClientId::new(settings.oidc_client_id.clone()),
+        settings.oidc_client_secret.clone().map(ClientSecret::new),
     )
     .set_redirect_uri(redirect);
     let client = Arc::new(client);
@@ -169,9 +180,30 @@ async fn oidc_client(config: &Config) -> AppResult<Arc<OidcClient>> {
     Ok(client)
 }
 
+/// Fetches the provider's discovery document.
+async fn discover(issuer: &str) -> AppResult<CoreProviderMetadata> {
+    let issuer = IssuerUrl::new(issuer.to_owned())
+        .map_err(|e| AppError::BadRequest(format!("invalid OIDC issuer URL: {e}")))?;
+    CoreProviderMetadata::discover_async(issuer, http_client())
+        .await
+        .map_err(|e| AppError::Upstream(format!("OIDC discovery failed: {}", error_chain(&e))))
+}
+
+/// Checks that `issuer` serves a usable discovery document and returns its
+/// authorization endpoint. Used by the setup page.
+pub async fn check_issuer(issuer: &str) -> AppResult<String> {
+    let metadata = discover(issuer).await?;
+    if metadata.token_endpoint().is_none() {
+        return Err(AppError::Upstream(
+            "the OIDC provider has no token endpoint".into(),
+        ));
+    }
+    Ok(metadata.authorization_endpoint().to_string())
+}
+
 /// Drops the cached client so the next request re-discovers the provider
-/// (keys or endpoints may have rotated).
-async fn forget_oidc_client() {
+/// (keys or endpoints may have rotated, or the settings changed).
+pub async fn forget_oidc_client() {
     *OIDC_CLIENT.lock().await = None;
 }
 
@@ -213,7 +245,25 @@ async fn login(State(state): State<AppState>, Query(q): Query<LoginQuery>) -> Ap
     if q.state.is_empty() || q.state.len() > 512 {
         return Err(AppError::BadRequest("invalid state".into()));
     }
+    begin_login(
+        &state,
+        KIND_DESKTOP,
+        &q.redirect_uri,
+        &q.state,
+        &q.code_challenge,
+    )
+    .await
+}
 
+/// Stores a pending login and redirects the browser to the identity
+/// provider. The `client_*` values are only used by desktop logins.
+pub async fn begin_login(
+    state: &AppState,
+    kind: &str,
+    client_redirect_uri: &str,
+    client_state: &str,
+    client_code_challenge: &str,
+) -> AppResult<Response> {
     // Opportunistic cleanup of abandoned logins.
     let now = db::now();
     sqlx::query("DELETE FROM pending_logins WHERE created_at < ?")
@@ -225,7 +275,7 @@ async fn login(State(state): State<AppState>, Query(q): Query<LoginQuery>) -> Ap
         .execute(&state.db)
         .await?;
 
-    let client = oidc_client(&state.config).await?;
+    let client = oidc_client(&state.settings()).await?;
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (url, csrf, nonce) = client
         .authorize_url(
@@ -241,15 +291,16 @@ async fn login(State(state): State<AppState>, Query(q): Query<LoginQuery>) -> Ap
     // The OIDC `state` doubles as the primary key of the pending row.
     sqlx::query(
         "INSERT INTO pending_logins (id, client_redirect_uri, client_state, client_code_challenge, \
-         oidc_pkce_verifier, nonce, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+         oidc_pkce_verifier, nonce, created_at, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(csrf.secret())
-    .bind(&q.redirect_uri)
-    .bind(&q.state)
-    .bind(&q.code_challenge)
+    .bind(client_redirect_uri)
+    .bind(client_state)
+    .bind(client_code_challenge)
     .bind(pkce_verifier.secret())
     .bind(nonce.secret())
     .bind(now)
+    .bind(kind)
     .execute(&state.db)
     .await?;
 
@@ -313,22 +364,24 @@ async fn finish_login(state: &AppState, q: CallbackQuery) -> Result<Response, Lo
 
     // Single use: the row is gone once looked up.
     let now = db::now();
-    let pending: Option<(String, String, String, String, String)> = sqlx::query_as(
+    let pending: Option<(String, String, String, String, String, String)> = sqlx::query_as(
         "DELETE FROM pending_logins WHERE id = ? AND created_at >= ? RETURNING \
-         client_redirect_uri, client_state, client_code_challenge, oidc_pkce_verifier, nonce",
+         client_redirect_uri, client_state, client_code_challenge, oidc_pkce_verifier, nonce, kind",
     )
     .bind(&oidc_state)
     .bind(now - PENDING_TTL_SECS)
     .fetch_optional(&state.db)
     .await?;
-    let Some((client_redirect, client_state, client_challenge, pkce_verifier, nonce)) = pending
+    let Some((client_redirect, client_state, client_challenge, pkce_verifier, nonce, kind)) =
+        pending
     else {
         return Err(bad(
             "This sign-in link has expired or was already used. Start again from Typeset.",
         ));
     };
 
-    let client = oidc_client(&state.config).await?;
+    let settings = state.settings();
+    let client = oidc_client(&settings).await?;
     let result = exchange(&client, code, pkce_verifier, nonce).await;
     let claims = match result {
         Ok(c) => c,
@@ -338,12 +391,12 @@ async fn finish_login(state: &AppState, q: CallbackQuery) -> Result<Response, Lo
         }
     };
 
-    if !state.config.allowed_emails.is_empty() {
+    if !settings.allowed_emails.is_empty() {
         let allowed = claims.email_verified != Some(false)
             && claims
                 .email
                 .as_ref()
-                .is_some_and(|e| state.config.allowed_emails.contains(&e.to_lowercase()));
+                .is_some_and(|e| settings.allowed_emails.contains(&e.to_lowercase()));
         if !allowed {
             return Err(LoginError(
                 StatusCode::FORBIDDEN,
@@ -365,6 +418,34 @@ async fn finish_login(state: &AppState, q: CallbackQuery) -> Result<Response, Lo
     .bind(now)
     .fetch_one(&state.db)
     .await?;
+
+    if kind != KIND_DESKTOP {
+        if kind == KIND_WEB_CLAIM {
+            // Only takes effect while there is no admin at all.
+            sqlx::query(
+                "UPDATE users SET is_admin = 1 WHERE id = ? \
+                 AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)",
+            )
+            .bind(&user_id)
+            .execute(&state.db)
+            .await?;
+        }
+        let token = random_token();
+        sqlx::query(
+            "INSERT INTO sessions (token_hash, user_id, device_name, created_at, last_used_at, \
+             expires_at) VALUES (?, ?, 'Admin page', ?, ?, ?)",
+        )
+        .bind(sha256_hex(token.as_bytes()))
+        .bind(&user_id)
+        .bind(now)
+        .bind(now)
+        .bind(now + WEB_SESSION_TTL_SECS)
+        .execute(&state.db)
+        .await?;
+        let secure = settings.public_url.starts_with("https://");
+        let cookie = set_cookie(SESSION_COOKIE, &token, WEB_SESSION_TTL_SECS, secure);
+        return Ok(([(header::SET_COOKIE, cookie)], Redirect::to("/admin")).into_response());
+    }
 
     let code = random_token();
     sqlx::query(
@@ -518,14 +599,43 @@ fn html_escape(s: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+/// Reads one cookie from the request.
+pub fn cookie_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    headers
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(k, _)| *k == name)
+        .map(|(_, v)| v)
+}
+
+/// Builds a `Set-Cookie` value scoped to the admin page. `Lax` lets the
+/// cookie ride the redirect back from the identity provider but keeps it
+/// off cross-site POSTs. A `max_age` of 0 deletes the cookie.
+pub fn set_cookie(name: &str, value: &str, max_age: i64, secure: bool) -> HeaderValue {
+    let secure = if secure { "; Secure" } else { "" };
+    HeaderValue::from_str(&format!(
+        "{name}={value}; Path=/admin; Max-Age={max_age}; HttpOnly; SameSite=Lax{secure}"
+    ))
+    .expect("cookie values are base64url")
+}
+
+/// Compares two strings in constant time.
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 /// 32 random bytes, base64url without padding.
-fn random_token() -> String {
+pub fn random_token() -> String {
     let mut bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
     B64.encode(bytes)
 }
 
-fn sha256_hex(data: &[u8]) -> String {
+pub fn sha256_hex(data: &[u8]) -> String {
     Sha256::digest(data)
         .iter()
         .fold(String::with_capacity(64), |mut s, b| {
@@ -560,9 +670,7 @@ fn is_loopback_redirect(uri: &str) -> bool {
 
 /// Checks `BASE64URL(SHA256(verifier)) == challenge` in constant time.
 fn verify_pkce(verifier: &str, challenge: &str) -> bool {
-    let computed = B64.encode(Sha256::digest(verifier.as_bytes()));
-    let (a, b) = (computed.as_bytes(), challenge.as_bytes());
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    constant_time_eq(&B64.encode(Sha256::digest(verifier.as_bytes())), challenge)
 }
 
 /// Appends URL-encoded query parameters, preserving any existing ones.
@@ -641,6 +749,20 @@ mod tests {
         let t = random_token();
         assert_eq!(t.len(), 43);
         assert_ne!(t, random_token());
+    }
+
+    #[test]
+    fn cookies() {
+        let mut headers = HeaderMap::new();
+        headers.append(header::COOKIE, "a=1; typeset_session=tok".parse().unwrap());
+        headers.append(header::COOKIE, "b=2".parse().unwrap());
+        assert_eq!(cookie_value(&headers, SESSION_COOKIE), Some("tok"));
+        assert_eq!(cookie_value(&headers, "b"), Some("2"));
+        assert_eq!(cookie_value(&headers, "session"), None);
+        assert_eq!(
+            set_cookie("n", "v", 60, true),
+            "n=v; Path=/admin; Max-Age=60; HttpOnly; SameSite=Lax; Secure"
+        );
     }
 
     #[test]
