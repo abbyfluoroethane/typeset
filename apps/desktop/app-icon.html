@@ -1,7 +1,12 @@
 <!doctype html>
 <!-- Source of the app icon: the "Ts" mark from Logo.svelte on a macOS-style
      tile. To regenerate, screenshot this page at 1024x1024 with a transparent
-     background into app-icon.png, then run `pnpm tauri icon app-icon.png`. -->
+     background into app-icon.png, then run `pnpm tauri icon app-icon.png`.
+
+     With ?layer in the URL the page draws only the letters, full canvas, for
+     the macOS 26 glass icon: screenshot that into
+     src-tauri/icons/AppIcon.icon/Assets/Ts.png. The system supplies the tile
+     shape, its colour (see icon.json) and the glass. -->
 <meta charset="utf-8" />
 <style>
   @font-face {
@@ -31,5 +36,14 @@
     letter-spacing: -0.04em;
     font-variation-settings: "opsz" 48;
   }
+  .layer .tile {
+    inset: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 534px;
+  }
 </style>
 <div class="tile">Ts</div>
+<script>
+  if (location.search.includes("layer")) document.documentElement.classList.add("layer");
+</script>

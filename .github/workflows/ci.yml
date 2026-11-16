@@ -16,7 +16,7 @@ jobs:
   rust:
     name: Rust
     # macOS is the platform the desktop app is built and tested on.
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -50,3 +50,53 @@ jobs:
       - run: echo '{"fetchedAt":0,"families":[]}' > src/lib/mock-catalog.json
       - run: pnpm check
       - run: pnpm build
+
+  bundle:
+    name: macOS app
+    # macOS 26 with Xcode 26 is the oldest runner that works here: its SDK
+    # gives the app the glass window controls, and its actool compiles the
+    # glass icon (icons/AppIcon.icon). Move forward from it, never back.
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that the runner is new enough
+        run: |
+          sw_vers
+          xcodebuild -version
+          major=$(sw_vers -productVersion | cut -d. -f1)
+          xcode=$(xcodebuild -version | awk 'NR==1 {print $2}' | cut -d. -f1)
+          if [ "$major" -lt 26 ] || [ "$xcode" -lt 26 ]; then
+            echo "::error::Needs macOS 26 and Xcode 26 or newer, found macOS $major and Xcode $xcode."
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bundle
+      - run: pnpm install --frozen-lockfile
+      # The mock backend imports a gitignored catalog snapshot.
+      - run: echo '{"fetchedAt":0,"families":[]}' > src/lib/mock-catalog.json
+      # tauri.glass.conf.json adds the glass icon to the normal icon list.
+      - run: pnpm tauri build --config src-tauri/tauri.glass.conf.json
+      - name: Check that the glass icon is in the app
+        working-directory: target/release/bundle/macos/Typeset.app/Contents
+        run: |
+          test -f Resources/Assets.car
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIconName" Info.plist
+          ls -la Resources
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Typeset-macos-arm64
+          path: target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
